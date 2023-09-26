@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #thumbnails {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            align-content: flex-start;
+            padding: 0;
+        }
+
+        .tile {
+            position: relative;
+            flex: 1 0 calc(33.33% - 10px);
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            overflow: hidden;
+            margin: 5px;
+            transition: z-index 0.3s;
+        }
+
+        .tile:hover {
+            z-index: 1;
+        }
+
+        .tile .hover-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .tile:hover .hover-effect,
+        .tile.tapped .hover-effect {
+            opacity: 1;
+        }
+
+        .tile .hover-effect:hover,
+        .tile.tapped .hover-effect:hover {
+            opacity: 0.7;
+        }
+
+        .tile img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            transition: transform 0.5s;
+        }
+
+        .tile:hover img,
+        .tile.tapped img {
+            transform: scale(1.1);
+        }
+
+        .tile.tapped img {
+            filter: brightness(50%);
+        }
+
+        .tile .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 5px;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .tile.tapped .overlay {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="thumbnails"></div>
+
+    <script>
+        fetch('/api/get-templates')
+            .then(response => response.json())
+            .then(data => {
+                const thumbnailsDiv = document.getElementById('thumbnails');
+
+                Object.keys(data).forEach(timestamp => {
+                const thumbnailData = JSON.parse(data[timestamp]);
+
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+
+                const hoverEffect = document.createElement('div');
+                hoverEffect.className = 'hover-effect';
+
+                const thumbnailImg = document.createElement('img');
+                thumbnailImg.src = thumbnailData.thumbnail_url.replace("default", "hqdefault");
+
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                overlay.innerText = `Title: ${
+                    thumbnailData.title
+                }\nViews: ${thumbnailData.views}\nLikes: ${thumbnailData.likes}`;
+
+                tile.appendChild(hoverEffect);
+                tile.appendChild(thumbnailImg);
+                tile.appendChild(overlay);
+
+                tile.addEventListener('click', () => {
+                    window.location.href = `https://youtube.com/watch?v=${thumbnailData.id}`;
+                });
+
+                tile.addEventListener('touchstart', event => {
+                    event.preventDefault();
+                    tile.classList.add('tapped');
+                });
+
+                tile.addEventListener('touchend', event => {
+                    event.preventDefault();
+                    tile.classList.remove('tapped');
+                });
+
+                thumbnailsDiv.appendChild(tile);
+                });
+            })
+            .catch(error => console.error(error));
+    </script>
+</body>
+</html>
