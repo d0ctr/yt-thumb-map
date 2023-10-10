@@ -16,9 +16,9 @@ import (
 )
 
 type Thumbnail struct {
-	url    string `json:"url"`
-	width  int    `json:"width"`
-	height int    `json:"height"`
+	Url    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 type YTVideoData struct {
@@ -57,9 +57,9 @@ func init() {
 	}
 	rdb = redis.NewClient(opts)
 
-	if os.Getenv("PORT") != "" {
-		httpPort = os.Getenv("PORT")
-	}
+	// if os.Getenv("PORT") != "" {
+	// 	httpPort = os.Getenv("PORT")
+	// }
 }
 
 func main() {
@@ -89,6 +89,7 @@ func main() {
 
 		// fetch video ids till possible
 		go func() {
+			defer close(videoIdsChannel)
 			log.Print("Video Ids fetcher started")
 			nextToken := ""
 			var videoIds []string
@@ -99,19 +100,18 @@ func main() {
 					break
 				}
 			}
-			close(videoIdsChannel)
 			log.Print("Video Ids fetcher finished")
 		}()
 
 		// fetch videos till new video ids exist
 		go func() {
+			defer close(videosChannel)
 			log.Print("Videos fetcher started")
 			for videoIds := range videoIdsChannel {
 				videos := fetchVideos(ctx, service, videoIds)
 
 				videosChannel <- videos
 			}
-			close(videosChannel)
 			log.Print("Videos fetcher finished")
 		}()
 
@@ -201,9 +201,9 @@ func fetchVideos(ctx context.Context, service *youtube.Service, videoIds []strin
 			ID:    item.Id,
 			Title: item.Snippet.Title,
 			Thumbnail: Thumbnail{
-				url:    item.Snippet.Thumbnails.Standard.Url,
-				width:  int(item.Snippet.Thumbnails.Standard.Width),
-				height: int(item.Snippet.Thumbnails.Standard.Height),
+				Url:    item.Snippet.Thumbnails.Standard.Url,
+				Width:  int(item.Snippet.Thumbnails.Standard.Width),
+				Height: int(item.Snippet.Thumbnails.Standard.Height),
 			},
 			LikesCount:    item.Statistics.LikeCount,
 			DislikesCount: item.Statistics.DislikeCount,
@@ -228,6 +228,7 @@ func writeToRedis(ctx context.Context, channelId string, videos []YTVideoData) {
 			log.Printf("Failed to marshalise data for video %s: %v", video.ID, err)
 			continue
 		}
+		log.Printf("Saving data: %s", string(data))
 
 		publishedDate, err := time.ParseInLocation(time.RFC3339, video.PublishedDate, time.UTC)
 		if err != nil {
@@ -236,14 +237,15 @@ func writeToRedis(ctx context.Context, channelId string, videos []YTVideoData) {
 		}
 
 		wg.Add(1)
-		ok++
 		go func() {
 			defer wg.Done()
 			// Save the video meta info to Redis
 			err = rdb.HSet(ctx, genChannelHashKey(channelId), publishedDate.Unix(), string(data)).Err()
 			if err != nil {
 				log.Printf("Failed to save video %s to Redis: %v", video.ID, err)
+				return
 			}
+			ok++
 		}()
 	}
 	wg.Wait()
