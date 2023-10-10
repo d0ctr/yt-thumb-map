@@ -40,11 +40,11 @@ func genChannelHashKey(channelId string) string {
 // Define your Redis connection details
 var rdb *redis.Client
 
-var httpPort string = "8080"
+// var httpPort string = "8080"
 
 func init() {
 	// load envs
-	err := godotenvvault.Load("../.env")
+	err := godotenvvault.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env files")
 	}
@@ -80,8 +80,8 @@ func main() {
 		log.Fatal("Couldn't fetch channel's id")
 	}
 
-	Server := CreateServer(rdb, channelId)
-	go Server.Start(httpPort)
+	// Server := CreateServer(rdb, channelId)
+	// go Server.Start(httpPort)
 
 	for {
 		videoIdsChannel := make(chan []string)
@@ -124,7 +124,7 @@ func main() {
 			log.Print("Redis saver finished")
 		}()
 
-		// Fetch new videos after every 1 hour
+		// Fetch new videos after every day
 		log.Print("Sleeping...")
 		time.Sleep(24 * time.Hour)
 	}
@@ -198,11 +198,11 @@ func fetchVideos(ctx context.Context, service *youtube.Service, videoIds []strin
 	// Process the fetched videos
 	for _, item := range response.Items {
 		data := YTVideoData{
-			ID:            item.Id,
-			Title:         item.Snippet.Title,
-			Thumbnail:     Thumbnail{
-				url: item.Snippet.Thumbnails.Standard.Url,
-				width: int(item.Snippet.Thumbnails.Standard.Width),
+			ID:    item.Id,
+			Title: item.Snippet.Title,
+			Thumbnail: Thumbnail{
+				url:    item.Snippet.Thumbnails.Standard.Url,
+				width:  int(item.Snippet.Thumbnails.Standard.Width),
 				height: int(item.Snippet.Thumbnails.Standard.Height),
 			},
 			LikesCount:    item.Statistics.LikeCount,
@@ -222,6 +222,7 @@ func writeToRedis(ctx context.Context, channelId string, videos []YTVideoData) {
 	ok := 0
 	var wg sync.WaitGroup
 	for _, video := range videos {
+		video := video
 		data, err := json.Marshal(video)
 		if err != nil {
 			log.Printf("Failed to marshalise data for video %s: %v", video.ID, err)
